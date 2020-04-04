@@ -54,38 +54,60 @@
         ((eq? (car args) #f) #f)
         (else (no-false? (cdr args)))))
 
-(define (apply-generic op . args)
+(define (raiser x hierarchy)
+  (if (null? hierarchy)
+      (error "empty hierarchy -- RAISE" hierarchy)
+      (let ((type (type-tag x)))
+        (if (eq? type (car hierarchy))
+            ((get-coercion type (cadr hierarchy)) x)
+            (and (not (null? (cddr hierarchy))) ;Return false if the next one is the highest
+                 (raiser x (cdr hierarchy)))))))
+
+(define (raise-to x target hierarchy)
+  ;Raises to target or gives original if it's higher or equal to the target
+  (define (iter x target)
+    (if (eq? (type-tag x) target)
+        x
+        (let ((raised (raiser x hierarchy)))
+          (and raised (iter raised target)))))
+  (or (iter x target) x))
+
+;; (define (iter-try-coerce type-tags args)
+;;   (if (null? type-tags)
+;;       #f
+;;       (let ((coerced (map (lambda (x)
+;;                             (raise-to x (car type-tags) type-hierarchy)) args)))
+;;         (if (all-eq? (map type-tag coerced))
+;;             coerced
+;;             (iter-try-coerce (cdr type-tags) args)))))
+
+(define (generate-apply-generic hierarchy)
   (define (iter-try-coerce type-tags args)
-    (if (null? type-tags) #f            ;Failed to coerce
-        (let ((target-type (car type-tags)))
-          (let ((coers (map (lambda (arg)
-                              ;Attempt creating list of coercion procedures
-                              ;where #t marks a datum which is already of the
-                              ;target type
-                              (if (eq? (type-tag arg) target-type)
-                                  #t
-                                  (get-coercion (type-tag arg) target-type)))
-                            args)))
-            (if (no-false? coers)
-                ;; If all can be coerced, do it
-                (map (lambda (f arg)
-                       (if (eq? f #t)
-                           arg
-                           (f arg))) coers args)
-                ;; Otherwise try the next possibility
-                (iter-try-coerce (cdr type-tags) args))))))
-  (let ((type-tags (map type-tag args)))
-    (let ((proc (get op type-tags)))
-      (if proc
-          (apply proc (map contents args))
-          (if (and (> (length args) 1) (not (all-eq? type-tags)))
-              (let ((coerced-args (iter-try-coerce type-tags args)))
-                (if coerced-args
-                    (apply apply-generic op coerced-args)
-                    (error "No method for these types - can't coerce arguments"
-                           (list op type-tags))))
-              (error "No method for these types"
-                     (list op type-tags)))))))
+    (if (null? type-tags)
+        #f
+        (let ((coerced (map (lambda (x)
+                              (raise-to x (car type-tags) hierarchy)) args)))
+          (if (all-eq? (map type-tag coerced))
+              coerced
+              (iter-try-coerce (cdr type-tags) args)))))
+  (define (apply-generic op . args)
+    (let ((type-tags (map type-tag args)))
+      (let ((proc (get op type-tags)))
+        (if proc
+            (apply proc (map contents args))
+            (if (and (> (length args) 1) (not (all-eq? type-tags)))
+                (let ((coerced-args (iter-try-coerce type-tags args)))
+                  (if coerced-args
+                      (apply apply-generic op coerced-args)
+                      (error "Can't coerce arguments"
+                             (list op type-tags))))
+                (error "No method for these types"
+                       (list op type-tags)))))))
+  apply-generic)
+
+(define type-hierarchy '(scheme-number rational real complex))
+
+(define apply-generic (generate-apply-generic type-hierarchy))
 
 (define (install-rectangular-package)
   ;; internal procedures
@@ -352,18 +374,33 @@
 ;Now, create the generic raise mechanism. The procedure is named "raiser"
 ;because of Racket's raise mechanism
 
-(define type-hierarchy '(scheme-number rational real complex))
+;;These were put above
 
-(define (raiser x type-hierarchy)
-  (if (null? type-hierarchy)
-      (error "empty hierarchy -- RAISE" type-hierarchy)
-      (if (eq? (type-tag x) (car type-hierarchy))
-          (if (null? (cdr type-hierarchy))
-              x
-              ((get-coercion (type-tag x) (cadr type-hierarchy)) x))
-          (raiser x (cdr type-hierarchy)))))
+;; (define type-hierarchy '(scheme-number rational real complex))
+
+;; (define (raiser x type-hierarchy)
+;;   (if (null? type-hierarchy)
+;;       (error "empty hierarchy -- RAISE" type-hierarchy)
+;;       (if (eq? (type-tag x) (car type-hierarchy))
+;;           (if (null? (cdr type-hierarchy))
+;;               x
+;;               ((get-coercion (type-tag x) (cadr type-hierarchy)) x))
+;;           (raiser x (cdr type-hierarchy)))))
 
 ;test
 (raiser (make-scheme-number 3) type-hierarchy) ;'(rational 3 . 1)
 (raiser (make-rational 3 5) type-hierarchy)    ;'(real . 0.6)
 (raiser (make-real 1.23455) type-hierarchy)    ;'(complex rectangular 1.23455 . 0)
+
+;;; Exercise 2.84
+
+;After the changes, test:
+(add 5 (make-rational 3 4))             ;'(rational 23 . 4)
+(add (make-rational 3 4) (make-complex-from-mag-ang 4 2.33)) ;'(complex rectangular -2.0033760815969535 . 2.901537549867278)
+(add (make-rational 5 7) (make-real 4.56465))                ;'(real . 5.278935714285715)
+(add (make-rational 4 5) (make-complex-from-mag-ang 2 4))
+;'(complex rectangular -0.5072872417272238 . -1.5136049906158564)
+
+;Test for arity 3 - should fail the right way by not finding appropriate operation
+;(apply-generic 'dummy 40 (make-real 4.55) (make-complex-from-real-imag 4 5))
+; No method for these types (dummy (complex complex complex))
