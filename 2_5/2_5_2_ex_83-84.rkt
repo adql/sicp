@@ -1,4 +1,5 @@
 #lang racket
+(provide (all-defined-out))
 
 ;;; -----------------------------------
 ;;; 2.5 Systems with Generic Operations
