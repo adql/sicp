@@ -100,9 +100,17 @@
        (lambda (var terms) (tag (make-poly var terms))))
 
   ;; Exercise 2.87
-  (define (=zero? p) (empty-termlist? (term-list p)))
+  (define (=zero-poly? p) (empty-termlist? (term-list p)))
   ;(since adjoin-term doesn't adjoin null-terms this is enough)
-  (put '=zero? '(polynomial) =zero?)
+  (put '=zero? '(polynomial) =zero-poly?)
+
+  ;; Exercise 2.88
+  (define (neg p)
+    (make-poly (variable p)
+               (mul-term-by-all-terms '(0 -1) (term-list p))))
+  (put 'neg '(polynomial)
+       (lambda (p) (tag (neg p))))
+  ;Then, subtraction is simply defined with apply-generic outside
   'done)
 
 ;;; Representing term lists
@@ -112,6 +120,18 @@
 
 (install-polynomial-package)
 
-;; Test ex. 2.87
+;;; Exercise 2.87
+
+;test
 (=zero? (make-polynomial 'x '()))       ;#t
 (=zero? (make-polynomial 'x '((2 2) (1 3)))) ;#f
+
+;;; Exercise 2.88
+
+(define (neg x) (apply-generic 'neg x))
+
+(define (sub x y)
+  (apply-generic 'add x (neg y)))
+
+;test
+(sub (make-polynomial 'x '((3 4) (1 2) (0 4))) (make-polynomial 'x '((3 2) (2 4) (0 1)))) ;'(polynomial x (3 2) (2 -4) (1 2) (0 3))
