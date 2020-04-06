@@ -100,7 +100,7 @@
        (lambda (var terms) (tag (make-poly var terms))))
 
   ;; Exercise 2.87
-  (define (=zero? p) (empty-termlist? p))
+  (define (=zero? p) (empty-termlist? (term-list p)))
   ;(since adjoin-term doesn't adjoin null-terms this is enough)
   (put '=zero? '(polynomial) =zero?)
   'done)
@@ -113,4 +113,5 @@
 (install-polynomial-package)
 
 ;; Test ex. 2.87
-(=zero? (make-polynomial 'x '()))
+(=zero? (make-polynomial 'x '()))       ;#t
+(=zero? (make-polynomial 'x '((2 2) (1 3)))) ;#f
