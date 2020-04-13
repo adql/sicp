@@ -105,12 +105,50 @@
   (put '=zero? '(polynomial) =zero-poly?)
 
   ;; Exercise 2.88
-  (define (neg p)
-    (make-poly (variable p)
-               (mul-term-by-all-terms '(0 -1) (term-list p))))
+  (define (neg-poly p)
+    (make-poly (variable p) (neg-terms (term-list p))))
+  (define (neg-terms L)
+    (mul-term-by-all-terms (make-term 0 -1) L))
+
+  (define (sub-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1)
+                   (sub-terms (term-list p1) (term-list p2)))
+        (error "Polys not in same var -- SUB-POLY")))
+  (define (sub-terms L1 L2)
+    (add-terms L1 (neg-terms L2)))
+
   (put 'neg '(polynomial)
-       (lambda (p) (tag (neg p))))
-  ;Then, subtraction is simply defined with apply-generic outside
+       (lambda (p) (tag (neg-poly p))))
+  (put 'sub '(polynomial polynomial)
+       (lambda (p1 p2) (tag (sub-poly p1 p2))))
+
+  ;; Exercise 2.91
+  (define (div-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (let ((division (div-terms (term-list p1) (term-list p2))))
+          (list (make-poly (car division))
+                (make-poly (cadr division))))
+        (error "Polys not in same var -- DIV-POLY"
+               (list p1 p2))))
+  (define (div-terms L1 L2)
+    (if (empty-termlist? L1)
+        (list (the-empty-termlist) (the-empty-termlist))
+        (let ((t1 (first-term L1))
+              (t2 (first-term L2)))
+          (if (> (order t2) (order t1))
+              (list (the-empty-termlist) L1)
+              (let ((new-c (div (coeff t1) (coeff t2)))
+                    (new-o (- (order t1) (order t2))))
+                (let ((rest-of-result
+                       (div-terms (sub-terms L1
+                                             (mul-term-by-all-terms (make-term new-o new-c) L2))
+                                  L2)
+                       ))
+                  (list (adjoin-term (make-term new-o new-c) (car rest-of-result))
+                        (cadr rest-of-result))))))))
+  (put 'div '(polynomial polynomial)
+       (lambda (p1 p2) (tag (div-poly p1 p2))))
   'done)
 
 ;;; Representing term lists
@@ -130,8 +168,14 @@
 
 (define (neg x) (apply-generic 'neg x))
 
-(define (sub x y)
-  (apply-generic 'add x (neg y)))
+(define (sub x y) (apply-generic 'sub x y))
 
 ;test
-(sub (make-polynomial 'x '((3 4) (1 2) (0 4))) (make-polynomial 'x '((3 2) (2 4) (0 1)))) ;'(polynomial x (3 2) (2 -4) (1 2) (0 3))
+(sub (make-polynomial 'x '((3 4) (1 2) (0 4)))
+     (make-polynomial 'x '((3 2) (2 4) (0 1)))) ;'(polynomial x (3 2) (2 -4) (1 2) (0 3))
+
+;;; Exercise 2.91
+
+;test
+(div (make-polynomial 'x '((4 3) (3 5) (2 1) (1 5) (0 3)))
+     (make-polynomial 'x '((2 5) (1 3) (0 5))))
