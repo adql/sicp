@@ -54,3 +54,18 @@
 
 ;;; Exercise 3.8
 
+;(+ (f 0) (f 1))
+
+(define f
+  (let ((val #f))
+    (lambda (arg)
+      (let ((v val))
+        (if v
+            (begin (set! val #f) (expt v arg))
+            (begin (set! val arg) 0))))))
+
+;test
+(+ (f 0) (f 1))                         ;0 Seems like Racket evaluates from left
+;to right. There's no way to change the evaluation order so the testing will be
+;artificial:
+(+ (f 1) (f 0))                         ;1
