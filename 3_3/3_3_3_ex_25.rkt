@@ -27,7 +27,7 @@
         (let ((subtable (assoc (car keys) (cdr table))))
           (cond ((not subtable) #f)
                 ((item? subtable) (cdr subtable))
-                ((null? (cdr keys)) (cadr subtable))
+                ((null? (cdr keys)) (cdr subtable))
                 (else (iter subtable (cdr keys))))))
       (iter local-table keys))
     (define (insert! keys value)
@@ -62,6 +62,9 @@
 ((table 'insert-proc!) '(c d e) 'hi)    ;ok
 ((table 'lookup-proc) '(c d e))         ;hi
 ((table 'lookup-proc) '(c d))           ;(e . hi)
+((table 'insert-proc!) '(c d f) 'joe!)  ;ok
+((table 'lookup-proc) '(c d e))         ;hi
+((table 'lookup-proc) '(c d))           ;((f . joe!) (e . hi))
 
 ; Of course, this implementation doesn't allow multi-arity key structure (e.g.
 ; having both '(a b c) and '(a b)), which would be possible but more complex to
